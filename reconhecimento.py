@@ -30,6 +30,25 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.7
 )
 
+def draw_rounded_rectangle(img, pt1, pt2, color, radius):
+    """
+    Desenha um retângulo com cantos arredondados.
+    pt1: Canto superior esquerdo
+    pt2: Canto inferior direito
+    """
+    x1, y1 = pt1
+    x2, y2 = pt2
+
+    # Desenha os 4 cantos (círculos preenchidos)
+    cv2.circle(img, (x1 + radius, y1 + radius), radius, color, -1)
+    cv2.circle(img, (x2 - radius, y1 + radius), radius, color, -1)
+    cv2.circle(img, (x1 + radius, y2 - radius), radius, color, -1)
+    cv2.circle(img, (x2 - radius, y2 - radius), radius, color, -1)
+
+    # Desenha os retângulos de preenchimento
+    cv2.rectangle(img, (x1 + radius, y1), (x2 - radius, y2), color, -1)
+    cv2.rectangle(img, (x1, y1 + radius), (x2, y2 - radius), color, -1)
+
 def extrair_features(hand_landmarks):
     """
     Extrai as features da mão para a predição, da mesma forma que no treinamento.
@@ -80,19 +99,37 @@ while cap.isOpened():
             prediction_numeric = model.predict([features])[0]
             predicted_label = le.inverse_transform([prediction_numeric])[0]
 
+            # --- Configurações do Texto ---
+            font = cv2.FONT_HERSHEY_COMPLEX_SMALL
+            font_scale = 1.5
+            font_thickness = 2
+            text_color = (0, 0, 0)       # Preto
+            bg_color = (255, 255, 255)   # Branco
+            corner_radius = 15           # Raio dos cantos
+            padding = 10
+
             # Define a posição do texto com base em qual mão é
-            if handedness == 'Right':
-                text = f"Direita: {predicted_label}"
-                org = (10, 50)
-                color = (0, 0, 0) # Verde
-            else: # Left
+            if handedness == 'Left':
                 text = f"Esquerda: {predicted_label}"
-                org = (frame.shape[1] - 250, 50) # Posição no canto superior direito
-                color = (0, 0, 0) # Azul
+                if {predicted_label} == 'Big Chungos':
+                    print("Você encontrou o Big Chungos!")
+                    
+                (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+                # Posição do retângulo
+                rect_start = (10, 30)
+                rect_end = (rect_start[0] + text_w + padding, rect_start[1] + text_h + padding)
+                # Posição do texto (canto inferior esquerdo)
+                text_org = (rect_start[0] + padding // 2, rect_start[1] + text_h + padding // 2)
+            else: # Direita
+                text = f"Direita: {predicted_label}"
+                (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+                rect_start = (frame.shape[1] - text_w - 20 - padding, 30)
+                rect_end = (frame.shape[1] - 10, rect_start[1] + text_h + padding)
+                text_org = (rect_start[0] + padding // 2, rect_start[1] + text_h + padding // 2)
 
-            # Escreve o resultado na tela
-            cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3, cv2.LINE_AA)
-
+            # Desenha o fundo e depois o texto
+            draw_rounded_rectangle(frame, rect_start, rect_end, bg_color, corner_radius)
+            cv2.putText(frame, text, text_org, font, font_scale, text_color, font_thickness, cv2.LINE_AA)
 
     cv2.imshow(WINDOW_NAME, frame)
 
