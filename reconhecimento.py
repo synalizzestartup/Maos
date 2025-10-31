@@ -111,9 +111,6 @@ while cap.isOpened():
             # Define a posição do texto com base em qual mão é
             if handedness == 'Left':
                 text = f"Esquerda: {predicted_label}"
-                if {predicted_label} == 'Big Chungos':
-                    print("Você encontrou o Big Chungos!")
-                    
                 (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, font_thickness)
                 # Posição do retângulo
                 rect_start = (10, 30)
