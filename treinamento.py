@@ -8,9 +8,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # --- Configurações ---
-DATA_PATH = "dados_gestos.csv"
-MODEL_PATH = "modelo_gestos.pkl"
-LABEL_ENCODER_PATH = "label_encoder.pkl"
+DATA_PATH = "C:\\Users\\Gustavo\\Desktop\\Synalizze - Sem Site\\Maos\\dados_gestos.csv"
+MODEL_PATH = "C:\\Users\\Gustavo\\Desktop\\Synalizze - Sem Site\\Maos\\modelo_gestos.pkl"
+LABEL_ENCODER_PATH = "C:\\Users\\Gustavo\\Desktop\\Synalizze - Sem Site\\Maos\\label_encoder.pkl"
 
 # The number of landmarks collected per hand
 NUM_LANDMARKS = 21 

@@ -1,11 +1,13 @@
 import cv2
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 import pickle
 import numpy as np
 
 # --- Configurações e Carregamento do Modelo ---
-MODEL_PATH = "modelo_gestos.pkl"
-LABEL_ENCODER_PATH = "label_encoder.pkl"
+MODEL_PATH = "C:\\Users\\Gustavo\\Desktop\\Synalizze - Sem Site\\Maos\\modelo_gestos.pkl"
+LABEL_ENCODER_PATH = "C:\\Users\\Gustavo\\Desktop\\Synalizze - Sem Site\\Maos\\label_encoder.pkl"
 NUM_LANDMARKS = 21
 
 print("Carregando modelo...")
@@ -20,15 +22,26 @@ except FileNotFoundError:
 
 print("Modelo carregado com sucesso!")
 
-# --- Inicialização do MediaPipe ---
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
+# --- Inicialização do MediaPipe (nova API) ---
+base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=2)
+hands = vision.HandLandmarker.create_from_options(options)
+
+# Conexões para desenhar as linhas da mão
+HAND_CONNECTIONS = [
+    # Polegar: 0-1-2-3-4
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    # Indicador: 0-5-6-7-8
+    (0, 5), (5, 6), (6, 7), (7, 8),
+    # Médio: 0-9-10-11-12
+    (0, 9), (9, 10), (10, 11), (11, 12),
+    # Anelinho: 0-13-14-15-16
+    (0, 13), (13, 14), (14, 15), (15, 16),
+    # Mindinho: 0-17-18-19-20
+    (0, 17), (17, 18), (18, 19), (19, 20),
+    # Conexões horizontais da palma
+    (5, 9), (9, 13), (13, 17)
+]
 
 def draw_rounded_rectangle(img, pt1, pt2, color, radius):
     """
@@ -54,16 +67,34 @@ def extrair_features(hand_landmarks):
     Extrai as features da mão para a predição, da mesma forma que no treinamento.
     """
     features = []
-    pulso_x = hand_landmarks.landmark[0].x
-    pulso_y = hand_landmarks.landmark[0].y
+    pulso_x = hand_landmarks[0].x
+    pulso_y = hand_landmarks[0].y
 
     for i in range(NUM_LANDMARKS):
-        landmark_x = hand_landmarks.landmark[i].x
-        landmark_y = hand_landmarks.landmark[i].y
+        landmark_x = hand_landmarks[i].x
+        landmark_y = hand_landmarks[i].y
         features.append(landmark_x - pulso_x)
         features.append(landmark_y - pulso_y)
 
     return features
+
+def desenhar_mao(frame, hand_landmarks):
+    """
+    Desenha os pontos e conexões da mão no frame.
+    """
+    # Desenha as conexões
+    for inicio, fim in HAND_CONNECTIONS:
+        x1 = int(hand_landmarks[inicio].x * frame.shape[1])
+        y1 = int(hand_landmarks[inicio].y * frame.shape[0])
+        x2 = int(hand_landmarks[fim].x * frame.shape[1])
+        y2 = int(hand_landmarks[fim].y * frame.shape[0])
+        cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    
+    # Desenha os pontos
+    for landmark in hand_landmarks:
+        x = int(landmark.x * frame.shape[1])
+        y = int(landmark.y * frame.shape[0])
+        cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
 
 # --- Loop Principal ---
 cap = cv2.VideoCapture(0)
@@ -79,20 +110,22 @@ while cap.isOpened():
         break
 
     # Inverte a imagem horizontalmente para um efeito de espelho
-    frame = cv2.flip(frame, 1)
+    #frame = cv2.flip(frame, 1)
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = hands.process(frame_rgb)
+    
+    # Converte para MediaPipe Image e detecta
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+    results = hands.detect(mp_image)
 
-    if results.multi_hand_landmarks:
-                # Itera sobre cada mão detectada
-        for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
+    if results and results.hand_landmarks:
+        # Itera sobre cada mão detectada
+        for i, hand_landmarks in enumerate(results.hand_landmarks):
             # Desenha os landmarks na mão
-            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            desenhar_mao(frame, hand_landmarks)
 
             # Identifica se a mão é esquerda ou direita
             # A imagem é espelhada, então a mão 'Right' do MediaPipe é a sua direita, que aparece à esquerda na tela.
-            handedness = results.multi_handedness[i].classification[0].label
-
+            handedness = results.handedness[i][0].category_name
 
             # Extrai as features e faz a predição
             features = extrair_features(hand_landmarks)
